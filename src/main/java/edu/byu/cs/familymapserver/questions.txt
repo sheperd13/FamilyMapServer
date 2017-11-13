@@ -1,0 +1,63 @@
+Where should I generate ID's? (DAO or object constructor)
+How should I check if a given ID is unique or not? (Where to access db to see if it's taken)
+Should I use float or decimal for latitude/longitude?
+
+public RunImportReturnObj runImport(String username, int level, Integer seed)
+	{
+		rand = MyRandomGenerator.getInstance();
+		if(seed == null)
+			rand.setSeed((int) System.nanoTime());
+		else
+			rand.setSeed(seed);
+
+		this.username = username;
+
+		String fnames = "data" + File.separator + "fnames.json";
+		String locations = "data" + File.separator + "locations.json";
+		String mnames = "data" + File.separator + "mnames.json";
+		String snames = "data" + File.separator + "snames.json";
+
+		fNamesArray = readData(fnames);
+		mNamesArray = readData(mnames);
+		sNamesArray = readData(snames);
+		locationsArray = readData(locations);
+
+		if(fNamesArray != null && mNamesArray != null && sNamesArray != null
+				&& locationsArray != null)
+		{
+			try
+			{
+				db.startTransaction();
+				db.fillReset(username);
+				db.closeTransaction(true);
+
+				db.startTransaction();
+				setUpSpecialCharacters();
+
+				//Make the root of the tree be the user that is logged in
+				User user = db.usersTable.getUserByUserName(username);
+				if(user == null) //the user isnt registered yet
+				{
+					db.closeTransaction(false);
+					return new RunImportReturnObj("The supplied user is not yet registered. Please register the user first", false);
+				}
+				Person thePerson = new Person();
+				thePerson.fillBasedOnUser(user);
+				fillEvents(thePerson, (int)(rand.nextDouble() * 500) + 1500);
+
+				//start the normal filling process (this will add the current user's person object to the DB)
+				fillTree(thePerson, level);
+				db.closeTransaction(true);
+				return new RunImportReturnObj("Successfully added " + String.valueOf(personsAdded) + " persons and " +
+					String.valueOf(eventsAdded) + " events to the database.", true);
+			}
+			catch (Exception e)
+			{
+				e.printStackTrace();
+				db.closeTransaction(false);
+				return new RunImportReturnObj("There was an error loading the DB. Error message: " + e.getMessage(), false);
+			}
+
+		}
+		return new RunImportReturnObj("Failed: One of the data files for importing could not be loaded. Missing/Corrupt?", false);
+	}
